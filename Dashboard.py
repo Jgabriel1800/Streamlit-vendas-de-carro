@@ -16,6 +16,16 @@ st.title('DASHBOARD DE VENDAS 🚗')
 
 arquivo_csv = 'car_ad.csv'
 dados = pd.read_csv(arquivo_csv, encoding="latin1")
+
+regioes_eua = {
+    "Norte": ["CT", "ME", "MA", "NH", "RI", "VT", "IA", "MI", "MN", "MT", "ND", "SD", "WI"],
+    "Sul": ["AL", "AR", "DE", "FL", "GA", "KY", "LA", "MD", "MS", "NC", "OK", "SC", "TN", "TX", "VA", "WV"],
+    "Leste": ["NJ", "NY", "PA", "OH", "IN", "IL", "MA", "VT", "NH", "RI", "CT"],
+    "Oeste": ["AK", "AZ", "CA", "CO", "HI", "ID", "NM", "NV", "OR", "UT", "WA", "WY"]
+}
+
+
+
 estados_eua_coords = {
     "AL": (32.806671, -86.791130),
     "AK": (61.370716, -149.493686),
@@ -73,6 +83,14 @@ num_linhas = dados.shape[0]
 dados["local da compra"] = np.random.choice(list(estados_eua_coords.keys()), num_linhas)
 np.random.seed(42)  
 num_linhas = dados.shape[0]
+
+def get_regiao(estado):
+    for regiao, estados in regioes_eua.items():
+        if estado in estados:
+            return regiao
+    return "Desconhecido"
+
+dados["regioes"] = dados["local da compra"].apply(get_regiao)
 
 dados["Latitude"] = dados["local da compra"].map(lambda estado: estados_eua_coords[estado][0])
 dados["Longitude"] = dados["local da compra"].map(lambda estado: estados_eua_coords[estado][1])
@@ -215,3 +233,5 @@ with aba3:
             yaxis_title='Marca de Carro' 
         )
         st.plotly_chart(fig_vendas_marcas_carro, use_container_width=True)
+
+st.write(dados)
