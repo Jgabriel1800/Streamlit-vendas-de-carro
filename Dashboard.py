@@ -17,14 +17,14 @@ st.title('DASHBOARD DE VENDAS 🚗')
 arquivo_csv = 'car_ad.csv'
 dados = pd.read_csv(arquivo_csv, encoding="latin1")
 
+
 regioes_eua = {
     "Norte": ["CT", "ME", "MA", "NH", "RI", "VT", "IA", "MI", "MN", "MT", "ND", "SD", "WI"],
     "Sul": ["AL", "AR", "DE", "FL", "GA", "KY", "LA", "MD", "MS", "NC", "OK", "SC", "TN", "TX", "VA", "WV"],
     "Leste": ["NJ", "NY", "PA", "OH", "IN", "IL", "MA", "VT", "NH", "RI", "CT"],
     "Oeste": ["AK", "AZ", "CA", "CO", "HI", "ID", "NM", "NV", "OR", "UT", "WA", "WY"]
 }
-
-
+marcas_carro=pd.DataFrame(dados.groupby('model')['price'].agg(['sum','count']))
 
 estados_eua_coords = {
     "AL": (32.806671, -86.791130),
@@ -78,11 +78,12 @@ estados_eua_coords = {
     "WI": (43.351915, -88.825217),
     "WY": (42.755966, -107.302490)
 }
+
+
 np.random.seed(42)  
 num_linhas = dados.shape[0]
 dados["local da compra"] = np.random.choice(list(estados_eua_coords.keys()), num_linhas)
-np.random.seed(42)  
-num_linhas = dados.shape[0]
+
 
 def get_regiao(estado):
     for regiao, estados in regioes_eua.items():
@@ -91,7 +92,6 @@ def get_regiao(estado):
     return "Desconhecido"
 
 dados["regioes"] = dados["local da compra"].apply(get_regiao)
-
 dados["Latitude"] = dados["local da compra"].map(lambda estado: estados_eua_coords[estado][0])
 dados["Longitude"] = dados["local da compra"].map(lambda estado: estados_eua_coords[estado][1])
 
@@ -101,126 +101,96 @@ datas_finais = pd.Timestamp("2024-12-31")
 dados["data da compra"] = pd.to_datetime(
     np.random.randint(datas_iniciais.timestamp(), datas_finais.timestamp(), num_linhas), unit="s"
 )
+dados['Ano de compra'] = dados['data da compra'].dt.year
 
 
-#TABELAS
-#Tabelas de receita
-receita_estados=dados.groupby('local da compra')[['price']].sum()
-receita_estados=dados.drop_duplicates(subset='local da compra')[['local da compra','Latitude','Longitude']].merge(receita_estados,left_on='local da compra',right_index=True).sort_values('price',ascending=False)
+st.sidebar.title('Filtros')
 
-receita_mensal=dados.set_index('data da compra').groupby(pd.Grouper(freq='M'))[['price']].sum().reset_index()
-receita_mensal['Ano']=receita_mensal['data da compra'].dt.year
-receita_mensal['Mes']=receita_mensal['data da compra'].dt.month_name()
+# Filtro de Região e ano
+regiao = st.sidebar.selectbox('Selecione a região', ['Todas as regiões', 'Norte', 'Sul', 'Leste', 'Oeste'])
 
-receita_car= dados.groupby('car')[['price']].sum().sort_values('price',ascending=False)
-#Tabelas de quantidade de vendas
 
-#Tabelas marcas de carro
-marcas_carro=pd.DataFrame(dados.groupby('model')['price'].agg(['sum','count']))
+ano = st.sidebar.selectbox('Selecione o ano', ['Todos os anos',2020, 2021, 2022, 2023, 2024], index=4)
 
-#graficos
-fig_mapa_receita= px.scatter_geo(receita_estados,lat='Latitude',lon='Longitude',
-  scope='usa',size='price',template='seaborn',hover_name='local da compra',
-  hover_data={'Latitude':False,'Longitude':False},
-  title='Receita por Estado')
+#  filtros
+dados_filtrados = dados
 
-fig_receita_mensal=px.line(receita_mensal,x='Mes',y='price',markers=True,
-                           range_y=(0, receita_mensal.max()),
-                           color='Ano',line_dash='Ano',
-                           title='Receita mensal')
-fig_receita_mensal.update_layout(yaxis_title='Receita')                           
+if regiao != 'Todas as regiões':
+    dados_filtrados = dados_filtrados[dados_filtrados['regioes'] == regiao]
 
-fig_receita_estado=px.bar(receita_estados.head(),
-                          x='local da compra',y='price',
-                          text_auto=True,title='Top estados (receita)')
-fig_receita_mensal.update_layout(yaxis_title='Receita') 
+if ano != 'Todos os anos':
+    dados_filtrados = dados_filtrados[dados_filtrados['Ano de compra'] == ano]
 
-fig_receita_carros=px.bar(receita_car,text_auto=True,
-                          title='Receita por marca de carro')
-fig_receita_mensal.update_layout(yaxis_title='Receita') 
+# Gráficos e tabelas
+receita_estados = dados_filtrados.groupby('local da compra')[['price']].sum()
+receita_estados = dados_filtrados.drop_duplicates(subset='local da compra')[['local da compra', 'Latitude', 'Longitude']].merge(receita_estados, left_on='local da compra', right_index=True).sort_values('price', ascending=False)
 
-# visualização streamlit
+receita_mensal = dados_filtrados.set_index('data da compra').groupby(pd.Grouper(freq='M'))[['price']].sum().reset_index()
+receita_mensal['Ano'] = receita_mensal['data da compra'].dt.year
+receita_mensal['Mes'] = receita_mensal['data da compra'].dt.month_name()
 
-aba1,aba2,aba3=st.tabs(['Receita','Quantidade de vendas','marcas de carro'])
+receita_car = dados_filtrados.groupby('car')[['price']].sum().sort_values('price', ascending=False)
+
+# Gráficos
+fig_mapa_receita = px.scatter_geo(
+    receita_estados, lat='Latitude', lon='Longitude', size='price', template='seaborn',
+    hover_name='local da compra', hover_data={'Latitude': False, 'Longitude': False},
+    title='Receita por Estado'
+)
+
+fig_receita_mensal = px.line(
+    receita_mensal, x='Mes', y='price', markers=True, range_y=(0, receita_mensal.max()),
+    color='Ano', line_dash='Ano', title='Receita Mensal'
+)
+
+fig_receita_estado = px.bar(
+    receita_estados.head(), x='local da compra', y='price', text_auto=True, title='Top Estados (Receita)'
+)
+
+fig_receita_carros = px.bar(
+    receita_car, text_auto=True, title='Receita por Marca de Carro'
+)
+
+# Layout do Streamlit
+aba1, aba2, aba3 = st.tabs(['Receita', 'Quantidade de Vendas', 'Marcas de Carro'])
 
 with aba1:
     coluna1, coluna2 = st.columns(2)
     with coluna1:
-        st.metric('Receita', formata_numero(dados['price'].sum()))
-        st.plotly_chart(fig_mapa_receita,use_container_width=True)
-        st.plotly_chart(fig_receita_estado,use_container_width=True)
+        st.metric('Receita', formata_numero(dados_filtrados['price'].sum()))
+        st.plotly_chart(fig_mapa_receita, use_container_width=True)
+        st.plotly_chart(fig_receita_estado, use_container_width=True)
     with coluna2:
-        st.metric('Quantidade de vendas', formata_numero(dados.shape[0]))
-        st.plotly_chart(fig_receita_mensal,use_container_width=True)
-        st.plotly_chart(fig_receita_carros,use_container_width=True)
+        st.metric('Quantidade de vendas', formata_numero(dados_filtrados.shape[0]))
+        st.plotly_chart(fig_receita_mensal, use_container_width=True)
+        st.plotly_chart(fig_receita_carros, use_container_width=True)
 
 with aba2:
-    coluna1, coluna2 = st.columns(2)
-    
-    with coluna1:
-        st.metric('Quantidade de vendas por estado', formata_numero(dados.shape[0]))
+    st.metric('Quantidade de Vendas por Estado', formata_numero(dados_filtrados.shape[0]))
 
-        estados_selecionados = st.multiselect(
-            'Selecione os estados para visualizar a quantidade de vendas',
-            options=dados['local da compra'].unique(),
-            default=dados['local da compra'].unique()[:5] 
-        )
-        
-        vendas_estados = dados[dados['local da compra'].isin(estados_selecionados)]
-        vendas_estados = vendas_estados.groupby('local da compra')['price'].count().reset_index().sort_values('price', ascending=False)
-        
-        fig_vendas_estados = px.bar(
-            vendas_estados,
-            x='local da compra', y='price',
-            text_auto=True, title='Quantidade de Vendas por Estado',
-            labels={'price': 'Quantidade de Vendas', 'local da compra': 'Estado'}
-        )
-        fig_vendas_estados.update_layout(
-            xaxis_title='Estado',
-            yaxis_title='Quantidade de Vendas'
-        )
-        st.plotly_chart(fig_vendas_estados, use_container_width=True)
-    
-    with coluna2:
-        st.metric('Quantidade de vendas por marca de carro', formata_numero(dados.shape[0]))
-        
-        marcas_selecionadas = st.multiselect(
-            'Selecione as marcas de carro para visualizar a quantidade de vendas',
-            options=dados['model'].unique(),
-            default=dados['model'].unique()[:5] 
-        )
-        
+    estados_selecionados = st.multiselect(
+        'Selecione os estados para visualizar a quantidade de vendas',
+        options=dados_filtrados['local da compra'].unique(),
+        default=dados_filtrados['local da compra'].unique()[:5]
+    )
 
-        vendas_marcas_carro = dados[dados['model'].isin(marcas_selecionadas)]
-        vendas_marcas_carro = vendas_marcas_carro.groupby('model')['price'].count().reset_index().sort_values('price', ascending=False)
-        
-        fig_vendas_marcas_carro = px.bar(
-            vendas_marcas_carro,
-            x='model', y='price',
-            text_auto=True, title='Quantidade de Vendas por Marca de Carro',
-            labels={'price': 'Quantidade de Vendas', 'model': 'Marca de Carro'}
-        )
-        fig_vendas_marcas_carro.update_layout(
-            xaxis_title='Marca de Carro',
-            yaxis_title='Quantidade de Vendas'
-        )
-        st.plotly_chart(fig_vendas_marcas_carro, use_container_width=True)
-        
+    vendas_estados = dados_filtrados[dados_filtrados['local da compra'].isin(estados_selecionados)]
+    vendas_estados = vendas_estados.groupby('local da compra')['price'].count().reset_index().sort_values('price', ascending=False)
+
+    fig_vendas_estados = px.bar(
+        vendas_estados, x='local da compra', y='price', text_auto=True, title='Quantidade de Vendas por Estado'
+    )
+    st.plotly_chart(fig_vendas_estados, use_container_width=True)
+
 with aba3:
-    qtd_marcas_carro = st.number_input('Quantidade de marcas de carro', 2, 10, 5)
+    qtd_marcas_carro = st.number_input('Quantidade de Marcas de Carro', 2, 10, 5)
     coluna1, coluna2 = st.columns(2)
     with coluna1:
-        st.metric('Receita', formata_numero(dados['price'].sum()))
         fig_receita_marcas_carro = px.bar(
-            marcas_carro[['sum']].sort_values('sum', ascending=False).head(qtd_marcas_carro),
-            x='sum', y=marcas_carro[['sum']].sort_values('sum', ascending=False).head(qtd_marcas_carro).index,
-            text_auto=True, title=f'Top {qtd_marcas_carro} marcas de carro (receita)'
-        )
-        fig_receita_marcas_carro.update_layout(
-            xaxis_title='Receita (R$)',  
-            yaxis_title='Marca de Carro'  
+            receita_car.head(qtd_marcas_carro), text_auto=True, title=f'Top {qtd_marcas_carro} Marcas de Carro por Receita'
         )
         st.plotly_chart(fig_receita_marcas_carro, use_container_width=True)
+
     with coluna2:
         st.metric('Quantidade de vendas', formata_numero(dados.shape[0]))
         fig_vendas_marcas_carro = px.bar(
@@ -234,4 +204,5 @@ with aba3:
         )
         st.plotly_chart(fig_vendas_marcas_carro, use_container_width=True)
 
-st.write(dados)
+
+st.write(dados_filtrados)
