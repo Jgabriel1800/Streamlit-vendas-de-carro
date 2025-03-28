@@ -2,6 +2,16 @@ import streamlit as st
 import pandas as pd
 import requests
 import numpy as np
+import time
+
+@st.cache_data
+def converter_csv(df):
+    return df.to_csv(index=False).encode('utf-8')
+
+def mensagem_concluido():
+    sucesso=st.success('Arquivo salvo com sucesso!',icon='✅')
+    time.sleep(4)
+    sucesso.empty()
 
 st.title('dados  Brutos')
 
@@ -66,6 +76,10 @@ with st.sidebar.expander('local da compra'):
     local = st.multiselect('Selecione o local da compra', 
                            dados_filtrados['local da compra'].unique(), 
                            dados_filtrados['local da compra'].unique())
+with st.sidebar.expander('regioes'):
+    regioes = st.multiselect('Selecione a região', 
+                             dados_filtrados['regioes'].unique(), 
+                             dados_filtrados['regioes'].unique())
 
 #Fazendo a filtragem 
 dados_filtrados = dados_filtrados[
@@ -85,7 +99,8 @@ dados_filtrados = dados_filtrados[
     (dados_filtrados['year'] <= ano[1]) &
     (dados_filtrados['model'].isin(model)) &
     (dados_filtrados['drive'].isin(drive)) &
-    (dados_filtrados['local da compra'].isin(local))
+    (dados_filtrados['local da compra'].isin(local)&
+     (dados_filtrados['regioes'].isin(regioes)))
 ]
 
 dados_filtrados = dados_filtrados[colunas]
@@ -93,3 +108,19 @@ dados_filtrados = dados_filtrados[colunas]
 st.dataframe(dados_filtrados)
 
 st.markdown(f'A tabela possui :blue[{dados_filtrados.shape[0]}] linhas e :blue[{dados_filtrados.shape[1]}] colunas')
+
+st.markdown('Como deseja que seja o nome desse arquivo')
+
+col1,col2=st.columns(2)
+with col1:
+    nome_arquivo=st.text_input('',label_visibility='collapsed',value='dados_filtrados.csv')
+    nome_arquivo+='.csv'
+
+with col2:
+    botao=st.download_button(
+        label='Baixar arquivo',
+        data=converter_csv(dados_filtrados),
+        file_name=nome_arquivo,
+        mime='text/csv',
+        help='Clique para baixar o arquivo'
+    )
