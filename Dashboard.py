@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
+import requests 
 import plotly.express as px
 
 st.set_page_config(layout='wide')
@@ -12,7 +12,7 @@ def formata_numero(valor, prefixo=''):
         valor /= 1000
     return f'{prefixo} {valor:.2f} milhões'
 
-st.title('DASHBOARD DE VENDAS 🚗')
+st.title('DASHBOARD DE VENDAS CARROS NOS EUA 🚗')
 
 arquivo_csv = 'car_ad.csv'
 dados = pd.read_csv(arquivo_csv, encoding="latin1")
