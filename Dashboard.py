@@ -205,4 +205,5 @@ with aba3:
         st.plotly_chart(fig_vendas_marcas_carro, use_container_width=True)
 
 
-st.write(dados_filtrados)
+dados_filtrados.to_csv("dados_filtrados_temp.csv", index=False)
+
